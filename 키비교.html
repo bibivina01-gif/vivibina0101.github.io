@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>캐릭터 키 비교표 생성기 (폰트 크기 확대)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+    <style>
+        /* 다양한 웹 폰트 불러오기 (눈누 무료 폰트) */
+        @font-face { font-family: 'DungGeunMo'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_six@1.2/DungGeunMo.woff') format('woff'); font-weight: normal; font-style: normal; }
+        @font-face { font-family: 'Galmuri11'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_20-10-21@1.0/Galmuri11.woff') format('woff'); font-weight: normal; font-style: normal; }
+        @font-face { font-family: 'Pretendard'; src: url('https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Regular.woff') format('woff'); font-weight: 400; font-style: normal; }
+        @font-face { font-family: 'KCCChassam'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302@1.0/KCC-Chassam.woff') format('woff'); font-weight: normal; font-style: normal; }
+        @font-face { font-family: 'Cafe24Ssurround'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff'); font-weight: normal; font-style: normal; }
+
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        
+        .main-layout { display: flex; gap: 20px; max-width: 1800px; margin: 0 auto; align-items: flex-start; }
+        
+        /* 좌측 조절 패널 */
+        .left-sidebar { width: 340px; flex-shrink: 0; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 15px; }
+        
+        .controls-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .control-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .row-group { display: flex; gap: 10px; align-items: center; }
+        
+        input[type="text"], input[type="number"], input[type="file"], select { padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 100%; box-sizing: border-box; font-family: inherit; }
+        input[type="number"] { width: 80px; }
+        input[type="range"] { cursor: pointer; }
+        
+        button { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; transition: background-color 0.2s; }
+        button:hover { background-color: #45a049; }
+        .btn-save { background-color: #2196F3; margin-top: 10px; }
+        .btn-save:hover { background-color: #0b7dda; }
+
+        /* 미세 조절 패널 */
+        #fine-tune-panel { display: none; background: #e3f2fd; padding: 20px; border-radius: 10px; border: 1px solid #90caf9; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .slider-group { display: flex; flex-direction: column; gap: 15px; }
+        .slider-group label { display: flex; flex-direction: column; font-size: 14px; }
+        .slider-group input[type="range"] { margin-top: 8px; }
+        
+        /* 우측 캔버스 영역 */
+        .right-canvas-wrapper { flex-grow: 1; overflow-x: auto; overflow-y: hidden; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 20px; }
+        
+        #export-area { 
+            position: relative; width: 1200px; 
+            height: 750px; 
+            background-color: white; border: 2px solid #333; overflow: hidden; margin: 0 auto;
+            transition: width 0.3s ease;
+            font-family: 'Malgun Gothic', sans-serif; /* 캔버스 기본 폰트 */
+        }
+        
+        /* 폰트 크기 확대 적용 영역 */
+        .team-title-display { text-align: center; font-size: 34px; font-weight: bold; padding-top: 20px; margin: 0; position: relative; z-index: 10; } /* 28px -> 34px */
+
+        #ruler-lines-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        .ruler-line-major { position: absolute; left: 0; width: 100%; height: 1px; background-color: #b0b0b0; }
+        .ruler-line-minor { position: absolute; left: 0; width: 100%; height: 1px; background-color: #f0f0f0; }
+        .ruler-labels { position: absolute; bottom: 0; left: 5px; height: 100%; width: 60px; z-index: 2; pointer-events: none; }
+        
+        .ruler-label { position: absolute; left: 0; font-size: 16px; color: #333; transform: translateY(50%); font-weight: bold; } /* 13px -> 16px */
+        
+        .ground-line { position: absolute; bottom: 50px; left: 0; width: 100%; height: 3px; background-color: #333; z-index: 3; }
+
+        /* 캐릭터 컨테이너 */
+        .character-wrapper {
+            position: absolute; bottom: 50px; left: 100px; cursor: ew-resize; z-index: 5;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            user-select: none;
+        }
+        .character-wrapper:active { cursor: grabbing; }
+        
+        .character-image-container { position: relative; display: flex; align-items: flex-end; justify-content: center; border-top: 2px dashed transparent; width: 100%; }
+        
+        .character-wrapper:hover .character-image-container,
+        .character-wrapper.selected .character-image-container { 
+            border-top: 2px dashed rgba(255, 0, 0, 0.8); 
+        } 
+        
+        .character-image { height: 100%; width: auto; pointer-events: none; transform-origin: bottom center; }
+        
+        /* 글씨가 커진 만큼 이름표 박스 위치를 -55px로 내려서 발끝을 가리지 않게 조정 */
+        .character-info { margin-top: 5px; text-align: center; background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 5px; font-weight: bold; position: absolute; bottom: -55px; width: max-content; box-shadow: 0 1px 3px rgba(0,0,0,0.2); pointer-events: none; border: 1px solid transparent; }
+        
+        .character-wrapper.selected .character-info { border: 1px solid #2196F3; color: #2196F3; }
+        
+        .character-name { font-size: 18px; } /* 16px -> 18px */
+        .character-height-text { font-size: 16px; color: #e91e63; margin-top: 2px; } /* 14px -> 16px */
+        
+        .instruction { font-size: 13px; color: #444; background: #fff8e1; padding: 12px; border-radius: 5px; border-left: 4px solid #ffc107; line-height: 1.5; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="main-layout">
+    
+    <div class="left-sidebar">
+        <div class="controls-container">
+            <h2 style="margin-top: 0; font-size: 20px;">⚙️ 표 기본 설정</h2>
+            
+            <div class="control-group">
+                <label><b>팀 이름:</b></label>
+                <input type="text" id="team-name" placeholder="예: 우리 팀 캐릭터들" oninput="updateTeamName()">
+            </div>
+            
+            <div class="control-group">
+                <label><b>표 글씨체 폰트:</b></label>
+                <select id="font-select" onchange="changeFont(this.value)">
+                    <option value="'Malgun Gothic', sans-serif">기본 (맑은 고딕)</option>
+                    <option value="'DungGeunMo', sans-serif">둥근모꼴 (픽셀 레트로)</option>
+                    <option value="'Galmuri11', sans-serif">갈무리11 (픽셀 또렷)</option>
+                    <option value="'Pretendard', sans-serif">프리텐다드 (세련·깔끔)</option>
+                    <option value="'Cafe24Ssurround', sans-serif">카페24 써라운드 (굵은 제목)</option>
+                    <option value="'KCCChassam', sans-serif">KCC 차쌈 (귀여운 손글씨)</option>
+                </select>
+            </div>
+            
+            <div class="control-group" style="margin-top: 10px;">
+                <label><b>표 가로 길이:</b> <span id="canvas-width-val">1200</span>px</label>
+                <input type="range" id="canvas-width-slider" min="800" max="4000" step="100" value="1200" oninput="updateCanvasWidth(this.value)">
+            </div>
+            
+            <button class="btn-save" onclick="saveAsImage()">📸 이미지로 깔끔하게 저장</button>
+            
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+            
+            <h2 style="margin-top: 0; font-size: 20px;">➕ 캐릭터 추가</h2>
+            <div class="control-group">
+                <input type="file" id="char-image" accept="image/png, image/jpeg">
+                <div class="row-group">
+                    <input type="text" id="char-name" placeholder="이름 (예: 에덴)">
+                    <input type="number" id="char-height" placeholder="키(cm)">
+                </div>
+                <button onclick="addCharacter()">캔버스에 추가</button>
+            </div>
+            <div class="instruction">
+                💡 <b>이동:</b> 캐릭터를 좌우로 드래그<br>
+                💡 <b>삭제:</b> 캐릭터를 <b>빠르게 더블클릭</b><br>
+                💡 <b>상세조절:</b> 캐릭터를 클릭하면 아래에 패널이 열립니다.
+            </div>
+        </div>
+
+        <div id="fine-tune-panel">
+            <h3 style="margin: 0 0 15px 0; color: #1565c0; font-size: 18px;">🛠️ 상세 조절 (<span id="selected-char-name"></span>)</h3>
+            <div class="slider-group">
+                <label>
+                    <span><b>비율 크기 조절</b> (현재: <span id="scale-val">1.00</span>배)</span>
+                    <input type="range" id="global-scale" min="0.5" max="2.0" step="0.005" value="1">
+                </label>
+                <label>
+                    <span><b>발끝 위치 조절</b> (현재: <span id="y-val">0</span>px)</span>
+                    <input type="range" id="global-y" min="-150" max="150" step="1" value="0">
+                </label>
+                <label>
+                    <span><b>✨ 오로라 (후광) 효과</b></span>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                        <input type="checkbox" id="aura-toggle" style="width: 20px; height: 20px; cursor: pointer;"> 
+                        <span>켜기</span>
+                        <input type="color" id="aura-color" value="#a29bfe" style="width: 60px; height: 30px; cursor: pointer; padding: 0; border: none;">
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-canvas-wrapper">
+        <div id="export-area">
+            <h1 class="team-title-display" id="display-team-name">팀 이름을 입력해주세요</h1>
+            <div id="ruler-lines-container"></div>
+            <div class="ruler-labels" id="ruler-labels"></div>
+            <div class="ground-line"></div>
+            <div id="canvas-characters"></div>
+        </div>
+    </div>
+    
+</div>
+
+<script>
+    const PIXELS_PER_CM = 3; 
+    const GROUND_BOTTOM = 50; 
+    const MAX_HEIGHT_CM = 220; 
+    let zIndexCounter = 10; 
+    let selectedCharacter = null; 
+
+    // 눈금선 생성
+    window.onload = function() {
+        const rulerLinesContainer = document.getElementById('ruler-lines-container');
+        const rulerLabels = document.getElementById('ruler-labels');
+        for (let cm = 0; cm <= MAX_HEIGHT_CM; cm += 1) { 
+            if (cm > 0) {
+                const bottomPosition = GROUND_BOTTOM + (cm * PIXELS_PER_CM);
+                if (cm % 10 === 0) {
+                    const majorLine = document.createElement('div');
+                    majorLine.className = 'ruler-line-major';
+                    majorLine.style.bottom = bottomPosition + 'px';
+                    rulerLinesContainer.appendChild(majorLine);
+                    
+                    const label = document.createElement('div');
+                    label.className = 'ruler-label';
+                    label.style.bottom = bottomPosition + 'px';
+                    label.innerText = cm + 'cm';
+                    rulerLabels.appendChild(label);
+                } else {
+                    const minorLine = document.createElement('div');
+                    minorLine.className = 'ruler-line-minor';
+                    minorLine.style.bottom = bottomPosition + 'px';
+                    rulerLinesContainer.appendChild(minorLine);
+                }
+            }
+        }
+    }
+
+    function updateTeamName() {
+        const input = document.getElementById('team-name').value;
+        document.getElementById('display-team-name').innerText = input || '팀 이름을 입력해주세요';
+    }
+
+    function changeFont(fontFamilyValue) {
+        document.getElementById('export-area').style.fontFamily = fontFamilyValue;
+    }
+
+    function updateCanvasWidth(val) {
+        document.getElementById('canvas-width-val').innerText = val;
+        document.getElementById('export-area').style.width = val + 'px';
+    }
+
+    function addCharacter() {
+        const fileInput = document.getElementById('char-image');
+        const nameInput = document.getElementById('char-name').value;
+        const heightInput = document.getElementById('char-height').value;
+
+        if (!fileInput.files[0] || !nameInput || !heightInput) {
+            alert("이미지, 이름, 키를 모두 입력해주세요!");
+            return;
+        }
+
+        const heightCm = parseFloat(heightInput);
+        const pixelHeight = heightCm * PIXELS_PER_CM;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            createCharacterElement(e.target.result, nameInput, heightCm, pixelHeight);
+        }
+        reader.readAsDataURL(fileInput.files[0]);
+
+        fileInput.value = '';
+        document.getElementById('char-name').value = '';
+        document.getElementById('char-height').value = '';
+    }
+
+    function createCharacterElement(imgSrc, name, cm, pxHeight) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'character-wrapper';
+        wrapper.style.left = '150px'; 
+        wrapper.style.zIndex = zIndexCounter++;
+
+        const imgContainer = document.createElement('div');
+        imgContainer.className = 'character-image-container';
+        imgContainer.style.height = pxHeight + 'px';
+
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.className = 'character-image';
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'character-info';
+        infoDiv.innerHTML = `<div class="character-name">${name}</div><div class="character-height-text">${cm}cm</div>`;
+
+        imgContainer.appendChild(img);
+        wrapper.appendChild(imgContainer);
+        wrapper.appendChild(infoDiv);
+
+        document.getElementById('canvas-characters').appendChild(wrapper);
+
+        const charData = {
+            wrapper: wrapper,
+            img: img,
+            name: name,
+            scale: 1.0,
+            yOffset: 0,
+            auraActive: false,
+            auraColor: '#a29bfe' 
+        };
+
+        wrapper.addEventListener('dblclick', function(e) {
+            e.stopPropagation();
+            if(selectedCharacter === charData) deselectCharacter();
+            wrapper.remove();
+        });
+
+        let isDragging = false;
+        let startX, initialLeft;
+        let moved = false; 
+
+        wrapper.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            moved = false;
+            wrapper.style.zIndex = zIndexCounter++; 
+            startX = e.clientX;
+            initialLeft = parseInt(window.getComputedStyle(wrapper).left) || 0;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            if (Math.abs(dx) > 3) moved = true; 
+            wrapper.style.left = (initialLeft + dx) + 'px';
+        });
+
+        document.addEventListener('mouseup', function(e) {
+            if (isDragging && !moved) {
+                selectCharacter(charData);
+            }
+            isDragging = false;
+        });
+    }
+
+    function selectCharacter(charData) {
+        if (selectedCharacter) selectedCharacter.wrapper.classList.remove('selected');
+        
+        selectedCharacter = charData;
+        charData.wrapper.classList.add('selected'); 
+        
+        document.getElementById('fine-tune-panel').style.display = 'block';
+        document.getElementById('selected-char-name').innerText = charData.name;
+        
+        document.getElementById('global-scale').value = charData.scale;
+        document.getElementById('scale-val').innerText = charData.scale.toFixed(2);
+        
+        document.getElementById('global-y').value = charData.yOffset;
+        document.getElementById('y-val').innerText = charData.yOffset;
+
+        document.getElementById('aura-toggle').checked = charData.auraActive;
+        document.getElementById('aura-color').value = charData.auraColor;
+    }
+
+    function deselectCharacter() {
+        if (selectedCharacter) {
+            selectedCharacter.wrapper.classList.remove('selected');
+            selectedCharacter = null;
+            document.getElementById('fine-tune-panel').style.display = 'none';
+        }
+    }
+
+    document.getElementById('export-area').addEventListener('mousedown', function(e) {
+        if (e.target.id === 'export-area' || e.target.id === 'ruler-lines-container' || e.target.classList.contains('ground-line')) {
+            deselectCharacter();
+        }
+    });
+
+    function updateCharacterAppearance() {
+        if (!selectedCharacter) return;
+        
+        selectedCharacter.img.style.transform = `scale(${selectedCharacter.scale})`;
+        
+        if (selectedCharacter.auraActive) {
+            selectedCharacter.img.style.filter = `drop-shadow(0px 0px 15px ${selectedCharacter.auraColor})`;
+        } else {
+            selectedCharacter.img.style.filter = 'none';
+        }
+    }
+
+    document.getElementById('global-scale').addEventListener('input', function(e) {
+        if (!selectedCharacter) return;
+        selectedCharacter.scale = parseFloat(e.target.value);
+        document.getElementById('scale-val').innerText = selectedCharacter.scale.toFixed(2);
+        updateCharacterAppearance();
+    });
+
+    document.getElementById('global-y').addEventListener('input', function(e) {
+        if (!selectedCharacter) return;
+        const val = parseInt(e.target.value);
+        selectedCharacter.yOffset = val;
+        selectedCharacter.wrapper.style.bottom = (GROUND_BOTTOM + val) + 'px';
+        document.getElementById('y-val').innerText = val;
+    });
+
+    document.getElementById('aura-toggle').addEventListener('change', function(e) {
+        if (!selectedCharacter) return;
+        selectedCharacter.auraActive = e.target.checked;
+        updateCharacterAppearance();
+    });
+
+    document.getElementById('aura-color').addEventListener('input', function(e) {
+        if (!selectedCharacter) return;
+        selectedCharacter.auraColor = e.target.value;
+        if (selectedCharacter.auraActive) updateCharacterAppearance();
+    });
+
+    // 이미지 저장
+    function saveAsImage() {
+        deselectCharacter(); // 빨간선 및 테두리 효과 해제
+        
+        const target = document.getElementById('export-area');
+        const teamName = document.getElementById('team-name').value || '캐릭터';
+        
+        setTimeout(() => {
+            htmlToImage.toPng(target, { 
+                backgroundColor: '#ffffff',
+                pixelRatio: 2
+            })
+            .then(function (dataUrl) {
+                const link = document.createElement('a');
+                link.download = `${teamName}_키비교표.png`;
+                link.href = dataUrl;
+                link.click();
+            })
+            .catch(function (error) {
+                console.error('이미지 저장 중 오류 발생!', error);
+                alert('이미지를 저장하는 중 문제가 발생했습니다.');
+            });
+        }, 100);
+    }
+</script>
+
+</body>
+</html>
